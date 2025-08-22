@@ -40,8 +40,8 @@ def flatten_structure_for_csv(structure, text_list):
         elif part.get('children'):
             flatten_structure_for_csv(part['children'], text_list)
 
-# --- Función Principal (v14 - Extracción Quirúrgica Definitiva) ---
-def extraer_textos_quirurgico():
+# --- Función Principal (v15 - Manejo de Formato Inconsistente) ---
+def extraer_textos_final():
     carpeta_ingles = 'ingles'
     carpeta_textos = 'textos'
 
@@ -57,11 +57,11 @@ def extraer_textos_quirurgico():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    # Regex quirúrgica Definitiva: extrae de dentro de los \\"..."
-    # Captura: 1=ID, 2=Contenido del texto en inglés
-    regex_quirurgico = re.compile(r'\\"ID\\"\s*:\s*\\"(.*?)\\".*?\\"English\\"\s*:\s*\\\\"(.*?)\\\\"')
+    # Regex quirúrgica que captura el valor de English entero, sin importar el formato
+    # Captura: 1=ID, 2=Contenido COMPLETO del valor English
+    regex_quirurgico = re.compile(r'\\"ID\\"\s*:\s*\\"(.*?)\\".*?\\"English\\"\s*:\s*\\"(.*?)\\"(?=[,\}])')
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v14 (definitiva)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v15 (formato dual)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -82,21 +82,32 @@ def extraer_textos_quirurgico():
             continue
 
         for match_item in regex_quirurgico.finditer(script_content):
-            id_original, texto_ingles = match_item.groups()
+            id_original, texto_ingles_bruto = match_item.groups()
 
-            if not texto_ingles:
+            # Detectar el formato y limpiar el texto
+            es_envuelto = False
+            if texto_ingles_bruto.startswith('\\"') and texto_ingles_bruto.endswith('\\"'):
+                es_envuelto = True
+                texto_ingles_limpio = texto_ingles_bruto[2:-2]
+            else:
+                texto_ingles_limpio = texto_ingles_bruto
+
+            # Un-escape final para procesar el texto
+            texto_ingles_final = texto_ingles_limpio.replace('\\"', '"').replace('\\\\', '\\')
+
+            if not texto_ingles_final:
                 continue
 
-            if EXCLUSION_PATTERN.match(texto_ingles):
+            if EXCLUSION_PATTERN.match(texto_ingles_final):
                 continue
 
-            estructura_parseada = parse_text(texto_ingles)
+            estructura_parseada = parse_text(texto_ingles_final)
 
             mapa_traduccion_final.append({
                 'id_original': id_original,
                 'archivo_original': ruta_archivo,
                 'estructura': estructura_parseada,
-                'texto_original_completo': texto_ingles # Guardamos el texto limpio para el importador
+                'formato_envuelto': es_envuelto # Guardamos el formato
             })
 
             textos_para_traducir = []
@@ -123,4 +134,4 @@ def extraer_textos_quirurgico():
     print(f"\n¡Proceso de extracción completado! Se han extraído {len(csv_rows)} fragmentos de texto.")
 
 if __name__ == '__main__':
-    extraer_textos_quirurgico()
+    extraer_textos_final()

@@ -29,8 +29,8 @@ def reconstruir_texto(structure, traducciones_iter):
             resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
     return "".join(resultado)
 
-# --- Función Principal (v7 - Importación Quirúrgica Definitiva) ---
-def importar_traducciones_definitivo():
+# --- Función Principal (v8 - Importación con Formato Dual) ---
+def importar_traducciones_final():
     carpeta_textos = 'textos'
     carpeta_espanol = 'espanol'
 
@@ -72,7 +72,7 @@ def importar_traducciones_definitivo():
         archivos_a_modificar[entrada['archivo_original']].append(entrada)
 
     # 4. Modificar cada archivo
-    print("Aplicando traducciones con la lógica v7 (quirúrgica definitiva)...")
+    print("Aplicando traducciones con la lógica v8 (formato dual)...")
     for archivo_path, mods in sorted(archivos_a_modificar.items()):
         print(f"  - Procesando archivo: {archivo_path}")
 
@@ -85,37 +85,41 @@ def importar_traducciones_definitivo():
 
         for mod in mods:
             id_original = mod['id_original']
-            texto_original_completo = mod['texto_original_completo']
+            formato_envuelto = mod['formato_envuelto']
 
             if id_original not in traducciones_por_id:
                 continue
 
-            # Escapar los textos para la regex
             id_escaped = re.escape(id_original)
-            texto_original_escaped_regex = re.escape(texto_original_completo)
 
-            # Regex para encontrar el texto original dentro de los \\"..."
+            # Regex para encontrar el valor de English para un ID
+            # Captura: 1=Todo hasta la comilla inicial, 2=El valor entero, 3=La comilla final
             patron_busqueda = re.compile(
                 r'(\\"ID\\"\s*:\s*\\"' + id_escaped +
-                r'\\".*?\\"English\\"\s*:\s*\\\\")' + # Grupo 1: Todo hasta el inicio del valor
-                texto_original_escaped_regex +       # El texto original que queremos reemplazar
-                r'(\\\\"' +                          # Grupo 2: El cierre del valor
-                r')'
+                r'\\".*?\\"English\\"\s*:\s*\\")' + # Grupo 1
+                r'(.*?)' +                         # Grupo 2: El valor actual
+                r'(\\"(?=[,\}]))'                   # Grupo 3: La comilla de cierre
             )
 
-            texto_traducido_nuevo = traducciones_por_id[id_original]
+            # Función de reemplazo
+            def replacer_final(match):
+                grupo_inicio = match.group(1)
+                grupo_fin = match.group(3)
 
-            # El texto de reemplazo debe estar escapado para JSON y para C#
-            # No usamos json.dumps para tener control total
-            texto_traducido_escaped = texto_traducido_nuevo.replace('\\', '\\\\').replace('"', '\\"')
+                texto_traducido_nuevo = traducciones_por_id[id_original]
 
-            # Reemplazamos usando los grupos de captura para preservar la estructura
-            # La nueva cadena será: (lo de antes) + nuevo texto + (lo de después)
-            contenido_total, num_reemplazos = patron_busqueda.subn(
-                r'\1' + texto_traducido_escaped + r'\2',
-                contenido_total,
-                count=1
-            )
+                # Escapamos el texto para que sea un valor de string válido
+                texto_traducido_escaped = texto_traducido_nuevo.replace('\\', '\\\\').replace('"', '\\"')
+
+                # Aplicamos el formato de envuelto si es necesario
+                if formato_envuelto:
+                    texto_final = f'\\\\"{texto_traducido_escaped}\\\\"'
+                else:
+                    texto_final = texto_traducido_escaped
+
+                return f'{grupo_inicio}{texto_final}{grupo_fin}'
+
+            contenido_total, num_reemplazos = patron_busqueda.subn(replacer_final, contenido_total, count=1)
 
             if num_reemplazos == 0:
                 print(f"    - ADVERTENCIA: No se pudo encontrar/reemplazar el texto para el ID {id_original}")
@@ -126,7 +130,7 @@ def importar_traducciones_definitivo():
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             f.write(contenido_total)
 
-    print("\n¡Proceso de importación v7 completado!")
+    print("\n¡Proceso de importación v8 completado!")
 
 if __name__ == '__main__':
-    importar_traducciones_definitivo()
+    importar_traducciones_final()
