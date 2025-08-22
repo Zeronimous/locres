@@ -75,7 +75,7 @@ def extraer_textos_actualizado():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v7 (manejo de m_Script vacíos)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v8 (diagnóstico)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -93,7 +93,6 @@ def extraer_textos_actualizado():
 
         json_str_raw = match.group(1)
 
-        # FIX: Ignorar si el contenido de m_Script está vacío o es solo whitespace
         if not json_str_raw.strip():
             print(f"  - ADVERTENCIA: m_Script está vacío en {nombre_archivo}. Omitiendo.")
             continue
@@ -139,6 +138,8 @@ def extraer_textos_actualizado():
 
         except json.JSONDecodeError as e:
             print(f"  - Error JSON en {nombre_archivo}: {e}")
+            # Línea de diagnóstico añadida:
+            print(f"    Contenido problemático (primeros 200 caracteres): {json_str_decoded[:200]}")
             continue
 
     ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
