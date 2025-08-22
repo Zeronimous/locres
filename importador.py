@@ -29,9 +29,8 @@ def reconstruir_texto(structure, traducciones_iter):
             resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
     return "".join(resultado)
 
-# --- Función Principal (Lógica v6 - Quirúrgica) ---
-
-def importar_traducciones_quirurgico():
+# --- Función Principal (v7 - Importación Quirúrgica Definitiva) ---
+def importar_traducciones_definitivo():
     carpeta_textos = 'textos'
     carpeta_espanol = 'espanol'
 
@@ -67,57 +66,56 @@ def importar_traducciones_quirurgico():
         texto_traducido = reconstruir_texto(estructura, traducciones_iter)
         traducciones_por_id[id_original] = texto_traducido
 
-    # 3. Agrupar IDs por archivo
+    # 3. Agrupar por archivo para eficiencia
     archivos_a_modificar = defaultdict(list)
     for entrada in mapa_traduccion:
-        archivos_a_modificar[entrada['archivo_original']].append(entrada['id_original'])
+        archivos_a_modificar[entrada['archivo_original']].append(entrada)
 
-    # 4. Modificar cada archivo de forma quirúrgica
-    print("Aplicando traducciones con la lógica v6 (quirúrgica)...")
-    for archivo_path, ids_en_archivo in sorted(archivos_a_modificar.items()):
+    # 4. Modificar cada archivo
+    print("Aplicando traducciones con la lógica v7 (quirúrgica definitiva)...")
+    for archivo_path, mods in sorted(archivos_a_modificar.items()):
         print(f"  - Procesando archivo: {archivo_path}")
 
         try:
-            # Usar 'utf-8-sig' para leer, garantizando que se maneja el BOM
             with open(archivo_path, 'r', encoding='utf-8-sig') as f:
                 contenido_total = f.read()
         except Exception as e:
             print(f"    - ERROR: No se pudo leer el archivo {archivo_path}. Error: {e}")
             continue
 
-        # Realizar el reemplazo para cada ID perteneciente a este archivo
-        for id_original in ids_en_archivo:
+        for mod in mods:
+            id_original = mod['id_original']
+            texto_original_completo = mod['texto_original_completo']
+
             if id_original not in traducciones_por_id:
                 continue
 
-            # Escapar el ID para usarlo en la regex de forma segura
+            # Escapar los textos para la regex
             id_escaped = re.escape(id_original)
+            texto_original_escaped_regex = re.escape(texto_original_completo)
 
-            # Construir una regex para encontrar el objeto JSON por su ID
-            # Se ha hecho más robusto para manejar espacios y saltos de línea
-            patron_obj_id = re.compile(
-                r'(\{\s*\\"ID\\"\s*:\s*\\"' + id_escaped + r'\\"\s*,' +  # Busca {"ID":"id",
-                r'[\s\S]*?' + # Cualquier caracter (incluyendo saltos de línea) hasta llegar a English
-                r'\\"English\\"\s*:\s*\\")' + # Busca "English":
-                r'((?:\\"|[^"])*?)' + # Captura el valor actual de English (Grupo 2). Maneja comillas escapadas.
-                r'(\\"' + # Captura la comilla de cierre (Grupo 3)
-                r'\s*[,\}])', # El valor termina en comilla y luego , o }
-                re.DOTALL
+            # Regex para encontrar el texto original dentro de los \\"..."
+            patron_busqueda = re.compile(
+                r'(\\"ID\\"\s*:\s*\\"' + id_escaped +
+                r'\\".*?\\"English\\"\s*:\s*\\\\")' + # Grupo 1: Todo hasta el inicio del valor
+                texto_original_escaped_regex +       # El texto original que queremos reemplazar
+                r'(\\\\"' +                          # Grupo 2: El cierre del valor
+                r')'
             )
 
-            # Función de reemplazo que inserta el texto traducido
-            def replacer_quirurgico(match):
-                grupo_inicio = match.group(1) # {"ID"...,"English":
-                grupo_fin = match.group(3) # "} o ",
+            texto_traducido_nuevo = traducciones_por_id[id_original]
 
-                # Obtener la traducción y escaparla para JSON
-                texto_traducido_nuevo = traducciones_por_id[id_original]
-                texto_traducido_escaped = json.dumps(texto_traducido_nuevo, ensure_ascii=False)[1:-1]
+            # El texto de reemplazo debe estar escapado para JSON y para C#
+            # No usamos json.dumps para tener control total
+            texto_traducido_escaped = texto_traducido_nuevo.replace('\\', '\\\\').replace('"', '\\"')
 
-                return f'{grupo_inicio}{texto_traducido_escaped}{grupo_fin}'
-
-            # Aplicar el reemplazo en el contenido del archivo
-            contenido_total, num_reemplazos = patron_obj_id.subn(replacer_quirurgico, contenido_total, count=1)
+            # Reemplazamos usando los grupos de captura para preservar la estructura
+            # La nueva cadena será: (lo de antes) + nuevo texto + (lo de después)
+            contenido_total, num_reemplazos = patron_busqueda.subn(
+                r'\1' + texto_traducido_escaped + r'\2',
+                contenido_total,
+                count=1
+            )
 
             if num_reemplazos == 0:
                 print(f"    - ADVERTENCIA: No se pudo encontrar/reemplazar el texto para el ID {id_original}")
@@ -125,11 +123,10 @@ def importar_traducciones_quirurgico():
         # Guardar el archivo final
         nombre_archivo_salida = os.path.basename(archivo_path)
         ruta_salida = os.path.join(carpeta_espanol, nombre_archivo_salida)
-        # Escribir con 'utf-8' es seguro, ya que el contenido no-ASCII no se ha tocado
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             f.write(contenido_total)
 
-    print("\n¡Proceso de importación v6 completado!")
+    print("\n¡Proceso de importación v7 completado!")
 
 if __name__ == '__main__':
-    importar_traducciones_quirurgico()
+    importar_traducciones_definitivo()
