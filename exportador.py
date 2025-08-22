@@ -41,7 +41,7 @@ def flatten_structure_for_csv(structure, text_list):
         elif part.get('children'):
             flatten_structure_for_csv(part['children'], text_list)
 
-# --- Función Principal (v22 - Híbrida/Definitiva) ---
+# --- Función Principal (v23 - Codificación CSV corregida) ---
 def extraer_textos_final():
     carpeta_ingles = 'ingles'
     carpeta_textos = 'textos'
@@ -58,7 +58,7 @@ def extraer_textos_final():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v22 (híbrida)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v23 (CSV con BOM)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -67,7 +67,6 @@ def extraer_textos_final():
         ruta_archivo = os.path.join(carpeta_ingles, nombre_archivo)
         print(f"Procesando: {ruta_archivo}")
 
-        # Usar utf-8-sig es más robusto que utf-8 a secas
         with open(ruta_archivo, 'r', encoding='utf-8-sig') as f:
             contenido_archivo = f.read()
 
@@ -79,15 +78,11 @@ def extraer_textos_final():
         if not json_str_raw.strip():
             continue
 
-        # Lógica de decodificación del script funcional proporcionado por el usuario
         json_str_decoded = ""
         try:
             temp_str = json_str_raw
-            # El BOM dentro del string se elimina manualmente
             if temp_str.startswith('\ufeff'):
                 temp_str = temp_str[1:]
-
-            # El método 'unicode_escape' es el correcto para este formato de C#
             json_str_decoded = codecs.decode(temp_str, 'unicode_escape')
         except Exception as e:
             print(f"  - ADVERTENCIA: Error de decodificación en {nombre_archivo}. Error: {e}")
@@ -103,7 +98,6 @@ def extraer_textos_final():
                     continue
 
                 es_envuelto = False
-                # La detección del formato dual es clave
                 if texto_ingles_bruto.startswith('"') and texto_ingles_bruto.endswith('"'):
                      es_envuelto = True
                      texto_ingles_limpio = texto_ingles_bruto[1:-1]
@@ -140,7 +134,8 @@ def extraer_textos_final():
 
     # Guardar CSV y Mapa
     ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
-    with open(ruta_csv, 'w', newline='', encoding='utf-8') as f:
+    # MODIFICACIÓN: Usar 'utf-8-sig' para que Excel y otros programas reconozcan los caracteres especiales.
+    with open(ruta_csv, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(['Índice', 'Texto a Traducir'])
         writer.writerows(csv_rows)
