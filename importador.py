@@ -29,7 +29,7 @@ def reconstruir_texto(structure, traducciones_iter):
             resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
     return "".join(resultado)
 
-# --- Función Principal (v8 - Importación con Formato Dual) ---
+# --- Función Principal (v30 - Importador Quirúrgico Restaurado y Correcto) ---
 def importar_traducciones_final():
     carpeta_textos = 'textos'
     carpeta_espanol = 'espanol'
@@ -60,7 +60,6 @@ def importar_traducciones_final():
     # 2. Preparar un diccionario con las traducciones por ID
     traducciones_por_id = {}
     traducciones_iter = iter(traducciones_csv)
-    # Es importante que el mapa se procese en el mismo orden en que se generó
     for entrada_mapa in mapa_traduccion:
         id_original = entrada_mapa['id_original']
         estructura = entrada_mapa['estructura']
@@ -73,7 +72,7 @@ def importar_traducciones_final():
         archivos_a_modificar[entrada['archivo_original']].append(entrada)
 
     # 4. Modificar cada archivo
-    print("Aplicando traducciones con la lógica v8 (quirúrgica y formato dual)...")
+    print("Aplicando traducciones con la lógica v30 (quirúrgica y segura)...")
     for archivo_path, mods in sorted(archivos_a_modificar.items()):
         print(f"  - Procesando archivo: {archivo_path}")
 
@@ -87,46 +86,37 @@ def importar_traducciones_final():
         for mod in mods:
             id_original = mod['id_original']
             formato_envuelto = mod['formato_envuelto']
-            texto_original_completo = mod['texto_original_completo']
 
             if id_original not in traducciones_por_id:
                 continue
 
             id_escaped = re.escape(id_original)
 
-            # El texto original también debe ser escapado para la regex
-            # Y además, debemos escapar los escapes de C# que pueda tener
-            texto_original_regex = re.escape(texto_original_completo)
-
-            # Si el original estaba envuelto, el patrón debe buscarlo así
-            if formato_envuelto:
-                # El texto original ya contiene las comillas escapadas, así que escapamos eso
-                texto_original_regex = re.escape(f'\\"{texto_original_completo}\\"')
-
-            # Regex para encontrar el texto original para un ID
-            # Esta regex es compleja porque debe manejar ambos formatos
+            # Regex robusta para encontrar el valor de English para un ID
             patron_busqueda = re.compile(
                 r'(\\"ID\\"\s*:\s*\\"' + id_escaped +
-                r'\\".*?\\"English\\"\s*:\s*\\")' + # Grupo 1: Todo hasta la comilla inicial
-                texto_original_regex +              # El texto original que queremos reemplazar
-                r'(\\")'                            # Grupo 2: La comilla de cierre
+                r'\\".*?\\"English\\"\s*:\s*\\")' + # Grupo 1: Todo hasta la comilla inicial del valor
+                r'(.*?)' +                         # Grupo 2: El valor actual
+                r'(\\"(?=[,\}]))'                   # Grupo 3: La comilla de cierre
+                , re.DOTALL
             )
 
-            texto_traducido_nuevo = traducciones_por_id[id_original]
-            texto_traducido_escaped = texto_traducido_nuevo.replace('\\', '\\\\').replace('"', '\\"')
+            # Función de reemplazo segura con lambda
+            def replacer_final(match):
+                grupo_inicio = match.group(1)
+                grupo_fin = match.group(3)
 
-            # Aplicamos el formato de envuelto si es necesario
-            if formato_envuelto:
-                texto_final_escaped = f'\\\\"{texto_traducido_escaped}\\\\"'
-            else:
-                texto_final_escaped = texto_traducido_escaped
+                texto_traducido_nuevo = traducciones_por_id[id_original]
+                texto_traducido_escaped = texto_traducido_nuevo.replace('\\', '\\\\').replace('"', '\\"')
 
-            # Reemplazamos usando los grupos de captura para preservar la estructura
-            contenido_total, num_reemplazos = patron_busqueda.subn(
-                r'\1' + texto_final_escaped + r'\2',
-                contenido_total,
-                count=1
-            )
+                if formato_envuelto:
+                    texto_final = f'\\\\"{texto_traducido_escaped}\\\\"'
+                else:
+                    texto_final = texto_traducido_escaped
+
+                return f'{grupo_inicio}{texto_final}{grupo_fin}'
+
+            contenido_total, num_reemplazos = patron_busqueda.subn(replacer_final, contenido_total, count=1)
 
             if num_reemplazos == 0:
                 print(f"    - ADVERTENCIA: No se pudo encontrar/reemplazar el texto para el ID {id_original}")
@@ -137,7 +127,7 @@ def importar_traducciones_final():
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             f.write(contenido_total)
 
-    print("\n¡Proceso de importación v8 completado!")
+    print("\n¡Proceso de importación completado!")
 
 if __name__ == '__main__':
     importar_traducciones_final()
