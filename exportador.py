@@ -1,17 +1,15 @@
 import os
-import json
-import csv
 import re
-import codecs
+import csv
+import json
 
-# --- Marcadores y Expresiones Regulares (Versión Final) ---
+# --- Mi lógica de parsing avanzado (es más robusta para los tags) ---
 EXCLUSION_PATTERN = re.compile(r'^\{[^}]+\}$')
 HTML_TAG_REGEX = r'(<([a-zA-Z0-9]+)([^>]*)>(.*?)</\2>)'
 BRACE_TAG_REGEX = r'(\{([a-zA-Z0-9]+)\}(.*?)\{/\6\})'
 VARIABLE_REGEX = r'(\{[^}]+\})'
 PARSER_REGEX = re.compile(f'{HTML_TAG_REGEX}|{BRACE_TAG_REGEX}|{VARIABLE_REGEX}', re.DOTALL)
 
-# --- Lógica de Análisis (Parsing) ---
 def parse_text(text):
     parts = []
     last_index = 0
@@ -41,80 +39,81 @@ def flatten_structure_for_csv(structure, text_list):
         elif part.get('children'):
             flatten_structure_for_csv(part['children'], text_list)
 
-# --- Función Principal (v23 - Codificación CSV corregida) ---
-def extraer_textos_final():
-    carpeta_ingles = 'ingles'
-    carpeta_textos = 'textos'
-
-    if not os.path.isdir(carpeta_ingles):
-        print(f"Error: La carpeta '{carpeta_ingles}' no existe.")
-        return
-    if not os.path.exists(carpeta_textos):
-        os.makedirs(carpeta_textos)
+# --- Función Principal (v29 - Dos Regex) ---
+def extraer_textos_dos_regex():
+    input_dir = "ingles"
+    output_dir = "textos"
+    os.makedirs(output_dir, exist_ok=True)
+    output_csv = os.path.join(output_dir, "traducciones.csv")
+    path_json = os.path.join(output_dir, "mapa.json")
 
     csv_rows = []
     mapa_traduccion_final = []
     base_index = 1
 
-    regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
+    regex_script_line = re.compile(r'string m_Script = "(.*?)"$', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v23 (CSV con BOM)...")
+    # Regex para formato complejo (con \\" dentro del valor)
+    regex_compleja = re.compile(r'\\"ID\\"\s*:\s*\\"(.*?)\\".*?\\"English\\"\s*:\s*\\"(.*?)\\"', re.DOTALL)
+    # Regex para formato simple (sin \\" dentro del valor), del script del usuario
+    regex_simple = re.compile(r'"ID":"([^"]+)"[^}]*?"English":"((?:[^"\\]|\\.)*?)"', re.DOTALL)
 
-    for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
-        if not nombre_archivo.endswith('.txt'):
+    print(f"Buscando archivos en '{input_dir}' con la lógica v29 (dos regex)...")
+
+    for filename in sorted(os.listdir(input_dir)):
+        if not filename.endswith(".txt"):
             continue
 
-        ruta_archivo = os.path.join(carpeta_ingles, nombre_archivo)
-        print(f"Procesando: {ruta_archivo}")
-
-        with open(ruta_archivo, 'r', encoding='utf-8-sig') as f:
-            contenido_archivo = f.read()
-
-        match_script = regex_script_line.search(contenido_archivo)
-        if not match_script:
-            continue
-
-        json_str_raw = match_script.group(1)
-        if not json_str_raw.strip():
-            continue
-
-        json_str_decoded = ""
+        file_path = os.path.join(input_dir, filename)
+        print(f"\nProcesando archivo: {filename}")
         try:
-            temp_str = json_str_raw
-            if temp_str.startswith('\ufeff'):
-                temp_str = temp_str[1:]
-            json_str_decoded = codecs.decode(temp_str, 'unicode_escape')
-        except Exception as e:
-            print(f"  - ADVERTENCIA: Error de decodificación en {nombre_archivo}. Error: {e}")
-            continue
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
 
-        try:
-            data = json.loads(json_str_decoded)
-            for item in data.get('Data', []):
-                texto_ingles_bruto = item.get('English')
-                id_original = item.get('ID')
+            script_match = regex_script_line.search(content)
+            if not script_match:
+                print(f"Advertencia: No se encontró m_Script en {filename}")
+                continue
 
-                if not id_original or texto_ingles_bruto is None:
-                    continue
+            script_content = script_match.group(1).lstrip('\ufeff')
+            if not script_content.strip():
+                continue
 
-                es_envuelto = False
-                if texto_ingles_bruto.startswith('"') and texto_ingles_bruto.endswith('"'):
-                     es_envuelto = True
-                     texto_ingles_limpio = texto_ingles_bruto[1:-1]
+            # Intentar primero con la regex compleja
+            matches = regex_compleja.findall(script_content)
+            is_complex_format = True
+            # Si no encuentra nada, probar con la regex simple
+            if not matches:
+                matches = regex_simple.findall(script_content)
+                is_complex_format = False
+
+            if not matches:
+                print(f"Advertencia: No se encontraron entradas 'English' en {filename}")
+                continue
+
+            print(f"Encontradas {len(matches)} entradas 'English' en {filename}")
+
+            for id_value, english_text_raw in matches:
+                # El des-escape depende del formato encontrado
+                if is_complex_format:
+                    texto_ingles = english_text_raw
                 else:
-                     texto_ingles_limpio = texto_ingles_bruto
+                    texto_ingles = re.sub(r'\\([\\"])', r'\1', english_text_raw)
 
-                if not texto_ingles_limpio or EXCLUSION_PATTERN.match(texto_ingles_limpio):
+                es_envuelto = texto_ingles.startswith('"') and texto_ingles.endswith('"')
+                texto_limpio_para_parser = texto_ingles[1:-1] if es_envuelto else texto_ingles
+
+                if not texto_limpio_para_parser or EXCLUSION_PATTERN.match(texto_limpio_para_parser):
                     continue
 
-                estructura_parseada = parse_text(texto_ingles_limpio)
+                estructura_parseada = parse_text(texto_limpio_para_parser)
 
                 mapa_traduccion_final.append({
-                    'id_original': id_original,
-                    'archivo_original': ruta_archivo,
+                    'id_original': id_value,
+                    'archivo_original': file_path,
                     'estructura': estructura_parseada,
                     'formato_envuelto': es_envuelto,
-                    'texto_original_completo': texto_ingles_limpio
+                    'texto_original_completo': texto_limpio_para_parser
                 })
 
                 textos_para_traducir = []
@@ -128,23 +127,19 @@ def extraer_textos_final():
                             csv_rows.append([f"{base_index}_{i+1}", texto])
                     base_index += 1
 
-        except json.JSONDecodeError as e:
-            print(f"  - Error JSON en {nombre_archivo}: {e}")
+        except Exception as e:
+            print(f"Error al procesar el archivo {filename}: {e}")
             continue
 
-    # Guardar CSV y Mapa
-    ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
-    # MODIFICACIÓN: Usar 'utf-8-sig' para que Excel y otros programas reconozcan los caracteres especiales.
-    with open(ruta_csv, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
+    with open(output_csv, 'w', encoding='utf-8-sig', newline='') as csvfile:
+        writer = csv.writer(csvfile)
         writer.writerow(['Índice', 'Texto a Traducir'])
         writer.writerows(csv_rows)
+    print(f"CSV generado en {output_csv} con {len(csv_rows)} entradas.")
 
-    ruta_mapa = os.path.join(carpeta_textos, 'mapa.json')
-    with open(ruta_mapa, 'w', encoding='utf-8') as f:
-        json.dump(mapa_traduccion_final, f, indent=2, ensure_ascii=False)
+    with open(path_json, 'w', encoding='utf-8') as jsonfile:
+        json.dump(mapa_traduccion_final, jsonfile, ensure_ascii=False, indent=4)
+    print(f"Archivo mapa.json generado en {path_json}.")
 
-    print(f"\n¡Proceso de extracción completado! Se han extraído {len(csv_rows)} fragmentos de texto.")
-
-if __name__ == '__main__':
-    extraer_textos_final()
+if __name__ == "__main__":
+    extraer_textos_dos_regex()

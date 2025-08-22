@@ -50,7 +50,7 @@ def importar_traducciones_final():
         mapa_traduccion = json.load(f)
 
     traducciones_csv = []
-    with open(ruta_csv, 'r', encoding='utf-8') as f:
+    with open(ruta_csv, 'r', encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         next(reader)
         for row in reader:
@@ -100,9 +100,11 @@ def importar_traducciones_final():
 
             # Si el original estaba envuelto, el patrón debe buscarlo así
             if formato_envuelto:
+                # El texto original ya contiene las comillas escapadas, así que escapamos eso
                 texto_original_regex = re.escape(f'\\"{texto_original_completo}\\"')
 
             # Regex para encontrar el texto original para un ID
+            # Esta regex es compleja porque debe manejar ambos formatos
             patron_busqueda = re.compile(
                 r'(\\"ID\\"\s*:\s*\\"' + id_escaped +
                 r'\\".*?\\"English\\"\s*:\s*\\")' + # Grupo 1: Todo hasta la comilla inicial

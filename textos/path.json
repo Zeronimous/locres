@@ -1,0 +1,66 @@
+{
+    "1": {
+        "file": "sample5.txt",
+        "id": "gang_status_name_1",
+        "structure": [
+            "text:1"
+        ],
+        "original": "Unaffiliated"
+    },
+    "2": {
+        "file": "sample5.txt",
+        "id": "gang_status_name_2",
+        "structure": [
+            "text:2"
+        ],
+        "original": "Member"
+    },
+    "3": {
+        "file": "sample5.txt",
+        "id": "gang_status_name_3",
+        "structure": [
+            "text:3"
+        ],
+        "original": "Lieutenant"
+    },
+    "4": {
+        "file": "sample5.txt",
+        "id": "gang_status_name_4",
+        "structure": [
+            "text:4"
+        ],
+        "original": "Boss"
+    },
+    "5": {
+        "file": "sample6.txt",
+        "id": "gang_status_name_1",
+        "structure": [
+            "text:5"
+        ],
+        "original": "Unaffiliated"
+    },
+    "6": {
+        "file": "sample6.txt",
+        "id": "gang_status_name_2",
+        "structure": [
+            "text:6"
+        ],
+        "original": "Member"
+    },
+    "7": {
+        "file": "sample6.txt",
+        "id": "gang_status_name_3",
+        "structure": [
+            "text:7"
+        ],
+        "original": "Lieutenant"
+    },
+    "8": {
+        "file": "sample6.txt",
+        "id": "gang_status_name_4",
+        "structure": [
+            "text:8"
+        ],
+        "original": "Boss"
+    }
+}
