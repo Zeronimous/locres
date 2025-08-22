@@ -2,10 +2,11 @@ import os
 import json
 import csv
 import re
+import codecs
 from collections import defaultdict
 
 # --- Lógica de Reconstrucción ---
-
+# Esta función sigue siendo necesaria para construir la cadena traducida final a partir de los fragmentos.
 def reconstruir_texto(structure, traducciones_iter):
     """
     Reconstruye el texto final a partir de la estructura y una lista
@@ -46,29 +47,7 @@ def reconstruir_texto(structure, traducciones_iter):
 
     return "".join(resultado)
 
-# --- Lógica para encontrar el texto original ---
-
-def get_original_text(structure):
-    """
-    Reconstruye el texto original desde la estructura para poder encontrarlo
-    en el archivo y reemplazarlo.
-    """
-    resultado = []
-    for part in structure:
-        tipo = part.get('type')
-        if tipo in ('text', 'variable'):
-            resultado.append(part['content'])
-        elif tipo == 'tag_html':
-            contenido_hijo = get_original_text(part['children'])
-            tag_name = part['tag'].split('=')[0]
-            resultado.append(f"<{part['tag']}>{contenido_hijo}</{tag_name}>")
-        elif tipo == 'tag_brace':
-            contenido_hijo = get_original_text(part['children'])
-            resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
-    return "".join(resultado)
-
-
-# --- Función Principal ---
+# --- Función Principal (Lógica v5) ---
 
 def importar_traducciones_actualizado():
     carpeta_textos = 'textos'
@@ -84,76 +63,98 @@ def importar_traducciones_actualizado():
     if not os.path.exists(carpeta_espanol):
         os.makedirs(carpeta_espanol)
 
-    # 1. Cargar datos
+    # 1. Cargar todos los datos necesarios
+    print("Cargando mapa y traducciones...")
     with open(ruta_mapa, 'r', encoding='utf-8') as f:
         mapa_traduccion = json.load(f)
 
-    traducciones = []
+    traducciones_csv = []
     with open(ruta_csv, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
-        next(reader)  # Omitir cabecera
+        next(reader) # Omitir cabecera
         for row in reader:
             if row:
-                traducciones.append(row[1])
+                traducciones_csv.append(row[1])
 
-    # Crear un iterador para consumir las traducciones una a una
-    traducciones_iter = iter(traducciones)
-
-    # 2. Agrupar modificaciones por archivo
-    modificaciones = defaultdict(list)
+    # 2. Preparar un diccionario con las traducciones reconstruidas por ID
+    traducciones_por_id = {}
+    traducciones_iter = iter(traducciones_csv)
     for entrada_mapa in mapa_traduccion:
-        archivo = entrada_mapa['archivo_original']
-        modificaciones[archivo].append(entrada_mapa)
+        id_original = entrada_mapa['id_original']
+        estructura = entrada_mapa['estructura']
+        texto_traducido = reconstruir_texto(estructura, traducciones_iter)
+        traducciones_por_id[id_original] = texto_traducido
 
-    # 3. Aplicar las modificaciones
-    print("Aplicando traducciones con la lógica v4 (la más segura)...")
-    for archivo_original, mods in modificaciones.items():
-        print(f"  - Modificando {archivo_original}")
+    # 3. Agrupar archivos a modificar para procesar cada archivo una sola vez
+    archivos_a_modificar = sorted(list(set(e['archivo_original'] for e in mapa_traduccion)))
 
-        with open(archivo_original, 'r', encoding='utf-8') as f:
-            contenido_total = f.read()
+    # 4. Modificar cada archivo
+    print("Aplicando traducciones con la lógica v5 (edición de datos)...")
+    regex_script_line = re.compile(r'(m_Script\s*=\s*")(.*)(")', re.DOTALL)
 
-        for mod in mods:
-            estructura = mod['estructura']
+    for archivo_path in archivos_a_modificar:
+        print(f"  - Procesando archivo: {archivo_path}")
 
-            # Reconstruir el texto original y el traducido
-            texto_original = get_original_text(estructura)
-            texto_traducido = reconstruir_texto(estructura, traducciones_iter)
+        try:
+            with open(archivo_path, 'r', encoding='utf-8') as f:
+                contenido_total = f.read()
+        except Exception as e:
+            print(f"    - ERROR: No se pudo leer el archivo {archivo_path}. Error: {e}")
+            continue
 
-            # Escapar para el reemplazo en el JSON
-            original_escaped_json = json.dumps(texto_original, ensure_ascii=False)[1:-1]
-            traducido_escaped_json = json.dumps(texto_traducido, ensure_ascii=False)[1:-1]
+        match = regex_script_line.search(contenido_total)
+        if not match:
+            print(f"    - ADVERTENCIA: No se encontró 'm_Script' en {archivo_path}.")
+            continue
 
-            # Patrón de búsqueda con regex, escapando el texto original para seguridad
-            patron_busqueda_regex = f'(\\"English\\"\\s*:\\s*\\"){re.escape(original_escaped_json)}(\\")'
+        # Capturamos el contenido original del script para reemplazarlo al final
+        script_line_prefix = match.group(1) # m_Script = "
+        json_str_raw = match.group(2)
+        script_line_suffix = match.group(3) # "
 
-            # FUNCIÓN DE REEMPLAZO (LA SOLUCIÓN DEFINITIVA)
-            # Usamos una función 'lambda' para el reemplazo. Esto trata el texto
-            # traducido como un texto literal y evita errores de 'bad escape'.
-            def replacer(match):
-                # Reconstruimos la cadena: (grupo 1) + texto traducido + (grupo 2)
-                # match.group(1) es '\"English\":\"'
-                # match.group(2) es '\"'
-                return f'{match.group(1)}{traducido_escaped_json}{match.group(2)}'
+        # Decodificar y cargar la data original
+        data = None
+        try:
+            temp_json_str = json_str_raw
+            if temp_json_str.startswith('\ufeff'):
+                temp_json_str = temp_json_str[1:]
+            json_str_decoded = codecs.decode(temp_json_str, 'unicode_escape')
+            data = json.loads(json_str_decoded)
+        except Exception as e:
+            print(f"    - ERROR: No se pudo decodificar o cargar el JSON de {archivo_path}. Error: {e}")
+            continue
 
-            # Aplicar el reemplazo usando re.subn y la función replacer
-            nuevo_contenido, num_reemplazos = re.subn(patron_busqueda_regex, replacer, contenido_total, count=1)
+        # Modificar la data en memoria
+        modificado = False
+        for item in data.get('Data', []):
+            if item.get('ID') in traducciones_por_id:
+                item['English'] = traducciones_por_id[item['ID']]
+                modificado = True
 
-            if num_reemplazos > 0:
-                contenido_total = nuevo_contenido
-            else:
-                print(f"  - ADVERTENCIA FINAL: No se encontró el patrón para el ID {mod['id_original']} en {archivo_original}.")
-                print(f"    Buscando (regex): {patron_busqueda_regex}")
+        # Si se modificó algo, volver a generar el string y reemplazarlo en el archivo
+        if modificado:
+            # Convertir la data modificada a un string JSON
+            nuevo_json_str = json.dumps(data, ensure_ascii=False)
 
-        # Guardar el archivo modificado
-        nombre_archivo_salida = os.path.basename(archivo_original)
-        ruta_salida = os.path.join(carpeta_espanol, nombre_archivo_salida)
+            # Escapar el string JSON para que sea un literal de C# válido
+            nuevo_json_escaped = nuevo_json_str.replace('\\', '\\\\').replace('"', '\\"')
 
-        with open(ruta_salida, 'w', encoding='utf-8') as f:
-            f.write(contenido_total)
+            # Reconstruir la línea completa de m_Script
+            linea_script_antigua = match.group(0)
+            linea_script_nueva = f"{script_line_prefix}{nuevo_json_escaped}{script_line_suffix}"
 
-    print("\n¡Proceso de importación v4 completado!")
-    print(f"Los archivos traducidos se han guardado en la carpeta: '{carpeta_espanol}'")
+            # Reemplazar la línea de script antigua por la nueva en el contenido total
+            contenido_total = contenido_total.replace(linea_script_antigua, linea_script_nueva)
+
+            # Guardar el archivo final
+            nombre_archivo_salida = os.path.basename(archivo_path)
+            ruta_salida = os.path.join(carpeta_espanol, nombre_archivo_salida)
+            with open(ruta_salida, 'w', encoding='utf-8') as f:
+                f.write(contenido_total)
+        else:
+            print(f"    - ADVERTENCIA: No se realizó ninguna modificación en {archivo_path}, aunque se esperaba.")
+
+    print("\n¡Proceso de importación v5 completado!")
 
 if __name__ == '__main__':
     importar_traducciones_actualizado()
