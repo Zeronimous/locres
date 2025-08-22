@@ -1,0 +1,302 @@
+[
+  {
+    "id_original": "use_limit_des_36",
+    "archivo_original": "ingles/sample1.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Requires "
+      },
+      {
+        "type": "variable",
+        "content": "{p2}"
+      },
+      {
+        "type": "text",
+        "content": " new batteries"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Requires {p2} new batteries"
+  },
+  {
+    "id_original": "use_limit_des_41",
+    "archivo_original": "ingles/sample1.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Needs a match"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Needs a match"
+  },
+  {
+    "id_original": "use_limit_des_47",
+    "archivo_original": "ingles/sample1.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Can only be taken at bedtime"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Can only be taken at bedtime"
+  },
+  {
+    "id_original": "use_limit_des_76",
+    "archivo_original": "ingles/sample1.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Needs hot water"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Needs hot water"
+  },
+  {
+    "id_original": "another_file_1",
+    "archivo_original": "ingles/sample2.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Hello"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Hello"
+  },
+  {
+    "id_original": "another_file_2",
+    "archivo_original": "ingles/sample2.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "World"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "World"
+  },
+  {
+    "id_original": "case1",
+    "archivo_original": "ingles/sample3.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "The pipes "
+      },
+      {
+        "type": "tag_html",
+        "tag": "T",
+        "children": [
+          {
+            "type": "text",
+            "content": "under the wire mesh"
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "content": " aren't too close together; I could fit between them."
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "The pipes <T>under the wire mesh</T> aren't too close together; I could fit between them."
+  },
+  {
+    "id_original": "case2",
+    "archivo_original": "ingles/sample3.txt",
+    "estructura": [
+      {
+        "type": "tag_html",
+        "tag": "A",
+        "children": [
+          {
+            "type": "tag_brace",
+            "tag": "i",
+            "children": [
+              {
+                "type": "text",
+                "content": "... Rattle... rumble... screech..."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "<A>{i}... Rattle... rumble... screech...{/i}</A>"
+  },
+  {
+    "id_original": "case4",
+    "archivo_original": "ingles/sample3.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Upgrade your cell's cupboard to increase the number of storage compartments to "
+      },
+      {
+        "type": "variable",
+        "content": "{p1}"
+      },
+      {
+        "type": "text",
+        "content": " blablabla."
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Upgrade your cell's cupboard to increase the number of storage compartments to {p1} blablabla."
+  },
+  {
+    "id_original": "case5",
+    "archivo_original": "ingles/sample3.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "This is a "
+      },
+      {
+        "type": "tag_html",
+        "tag": "color=#ff003c",
+        "children": [
+          {
+            "type": "text",
+            "content": "red"
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "content": " text."
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "This is a <color=#ff003c>red</color> text."
+  },
+  {
+    "id_original": "case6",
+    "archivo_original": "ingles/sample4.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Are you sure to start with "
+      },
+      {
+        "type": "variable",
+        "content": "{x1}"
+      },
+      {
+        "type": "text",
+        "content": " mode? "
+      },
+      {
+        "type": "variable",
+        "content": "{Wrap}"
+      },
+      {
+        "type": "text",
+        "content": "After selecting, you won't be able to change this save data to the other modes."
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Are you sure to start with {x1} mode? {Wrap}After selecting, you won't be able to change this save data to the other modes."
+  },
+  {
+    "id_original": "gang_status_name_1",
+    "archivo_original": "ingles/sample5.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Unaffiliated"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Unaffiliated"
+  },
+  {
+    "id_original": "gang_status_name_2",
+    "archivo_original": "ingles/sample5.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Member"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Member"
+  },
+  {
+    "id_original": "gang_status_name_3",
+    "archivo_original": "ingles/sample5.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Lieutenant"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Lieutenant"
+  },
+  {
+    "id_original": "gang_status_name_4",
+    "archivo_original": "ingles/sample5.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Boss"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Boss"
+  },
+  {
+    "id_original": "gang_status_name_1",
+    "archivo_original": "ingles/sample6.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Unaffiliated"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Unaffiliated"
+  },
+  {
+    "id_original": "gang_status_name_2",
+    "archivo_original": "ingles/sample6.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Member"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Member"
+  },
+  {
+    "id_original": "gang_status_name_3",
+    "archivo_original": "ingles/sample6.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Lieutenant"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Lieutenant"
+  },
+  {
+    "id_original": "gang_status_name_4",
+    "archivo_original": "ingles/sample6.txt",
+    "estructura": [
+      {
+        "type": "text",
+        "content": "Boss"
+      }
+    ],
+    "formato_envuelto": false,
+    "texto_original_completo": "Boss"
+  }
+]
