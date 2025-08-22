@@ -5,8 +5,8 @@ import re
 
 # --- Marcadores y Expresiones Regulares (Versión 2) ---
 
-# Expresión para excluir textos que son solo una variable interna (ej: {sigh1})
-EXCLUSION_PATTERN = re.compile(r'^\{[a-zA-Z0-9_]+\}$')
+# Expresión para excluir textos que son solo una variable interna (ej: {sigh1}, {Wrap})
+EXCLUSION_PATTERN = re.compile(r'^\{[^}]+\}$')
 
 # Regex para marcadores estilo HTML: <tag>...</tag> o <tag=value>...</tag>
 # Grupo 1: El tag completo (ej: <T>...</T>)
@@ -22,9 +22,9 @@ HTML_TAG_REGEX = r'(<([a-zA-Z0-9]+)([^>]*)>(.*?)</\2>)'
 # Grupo 7: El contenido interno (ej: ...Rattle...)
 BRACE_TAG_REGEX = r'(\{([a-zA-Z0-9]+)\}(.*?)\{/\6\})'
 
-# Regex para variables que no se traducen: {p1}, {p2}, etc.
-# Grupo 8: La variable completa (ej: {p1})
-VARIABLE_REGEX = r'(\{p\d+\})'
+# Regex para variables que no se traducen: {p1}, {x1}, {Wrap}, etc.
+# Grupo 8: La variable completa (ej: {x1})
+VARIABLE_REGEX = r'(\{[^}]+\})'
 
 # Combinamos todas las expresiones en una sola. El orden es importante.
 # Buscamos tags HTML, o tags de llave, o variables.
@@ -99,12 +99,13 @@ def extraer_textos_actualizado():
     if not os.path.exists(carpeta_textos):
         os.makedirs(carpeta_textos)
 
-    textos_para_csv = []
+    csv_rows = []
     mapa_traduccion_final = []
+    base_index = 1
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v2...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v3 (sub-índices)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -146,7 +147,18 @@ def extraer_textos_actualizado():
                     'estructura': estructura_parseada
                 })
 
-                flatten_structure_for_csv(estructura_parseada, textos_para_csv)
+                # Aplanar la estructura para obtener los fragmentos de texto
+                textos_para_traducir = []
+                flatten_structure_for_csv(estructura_parseada, textos_para_traducir)
+
+                # Generar las filas del CSV con el formato de sub-índice
+                if len(textos_para_traducir) == 1:
+                    csv_rows.append([base_index, textos_para_traducir[0]])
+                else:
+                    for i, texto in enumerate(textos_para_traducir):
+                        csv_rows.append([f"{base_index}_{i+1}", texto])
+
+                base_index += 1
 
         except json.JSONDecodeError as e:
             print(f"  - Error JSON en {nombre_archivo}: {e}")
@@ -157,16 +169,15 @@ def extraer_textos_actualizado():
     with open(ruta_csv, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(['Índice', 'Texto a Traducir'])
-        for i, texto in enumerate(textos_para_csv, 1):
-            writer.writerow([i, texto])
+        writer.writerows(csv_rows)
 
     # Guardar el mapa de reconstrucción
     ruta_mapa = os.path.join(carpeta_textos, 'mapa.json')
     with open(ruta_mapa, 'w', encoding='utf-8') as f:
         json.dump(mapa_traduccion_final, f, indent=2, ensure_ascii=False)
 
-    print("\n¡Proceso de extracción v2 completado!")
-    print(f"Se han extraído {len(textos_para_csv)} fragmentos de texto.")
+    print("\n¡Proceso de extracción v3 (sub-índices) completado!")
+    print(f"Se han extraído {len(csv_rows)} fragmentos de texto.")
     print(f"Puedes encontrar los textos para traducir en: {ruta_csv}")
     print(f"El nuevo mapa de estructura se ha guardado en: {ruta_mapa}")
 
