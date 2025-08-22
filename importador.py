@@ -4,119 +4,147 @@ import csv
 import re
 from collections import defaultdict
 
-def importar_traducciones():
+# --- Lógica de Reconstrucción ---
+
+def reconstruir_texto(structure, traducciones_iter):
     """
-    Lee los textos traducidos desde un archivo CSV y los reinserta en
-    copias de los archivos originales, guardándolos en la carpeta 'español'.
+    Reconstruye el texto final a partir de la estructura y una lista
+    de fragmentos traducidos. Es una función recursiva.
     """
+    resultado = []
+    for part in structure:
+        tipo = part.get('type')
+        if tipo == 'text':
+            # Si el texto original estaba vacío o solo espacios, no está en el CSV.
+            if part['content'].strip():
+                try:
+                    # Tomar el siguiente texto de la lista de traducciones
+                    resultado.append(next(traducciones_iter))
+                except StopIteration:
+                    print("Error: Faltan traducciones en el archivo CSV para reconstruir una frase.")
+                    # Añadir el contenido original como fallback
+                    resultado.append(part['content'])
+            else:
+                # Añadir el texto original si estaba vacío o era solo espacio
+                resultado.append(part['content'])
+
+        elif tipo == 'variable':
+            resultado.append(part['content'])
+
+        elif tipo == 'tag_html':
+            # Reconstruir el contenido de los hijos recursivamente
+            contenido_hijo = reconstruir_texto(part['children'], traducciones_iter)
+            # Envolver con la etiqueta HTML
+            tag_name = part['tag'].split('=')[0] # Para <color=..> nos quedamos con "color"
+            resultado.append(f"<{part['tag']}>{contenido_hijo}</{tag_name}>")
+
+        elif tipo == 'tag_brace':
+            # Reconstruir el contenido de los hijos recursivamente
+            contenido_hijo = reconstruir_texto(part['children'], traducciones_iter)
+            # Envolver con la etiqueta de llaves
+            resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
+
+    return "".join(resultado)
+
+# --- Lógica para encontrar el texto original ---
+
+def get_original_text(structure):
+    """
+    Reconstruye el texto original desde la estructura para poder encontrarlo
+    en el archivo y reemplazarlo.
+    """
+    resultado = []
+    for part in structure:
+        tipo = part.get('type')
+        if tipo in ('text', 'variable'):
+            resultado.append(part['content'])
+        elif tipo == 'tag_html':
+            contenido_hijo = get_original_text(part['children'])
+            tag_name = part['tag'].split('=')[0]
+            resultado.append(f"<{part['tag']}>{contenido_hijo}</{tag_name}>")
+        elif tipo == 'tag_brace':
+            contenido_hijo = get_original_text(part['children'])
+            resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
+    return "".join(resultado)
+
+
+# --- Función Principal ---
+
+def importar_traducciones_actualizado():
     carpeta_textos = 'textos'
-    carpeta_español = 'espanol'
+    carpeta_espanol = 'espanol'
 
     ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
     ruta_mapa = os.path.join(carpeta_textos, 'mapa.json')
 
-    # Validar que los archivos necesarios existan
-    if not os.path.exists(ruta_csv):
-        print(f"Error: El archivo de traducciones '{ruta_csv}' no se encuentra.")
-        print("Asegúrate de haber guardado tus traducciones en ese archivo.")
-        return
-    if not os.path.exists(ruta_mapa):
-        print(f"Error: El archivo de mapeo '{ruta_mapa}' no se encuentra.")
+    if not all(os.path.exists(p) for p in [ruta_csv, ruta_mapa]):
+        print("Error: Faltan los archivos 'traducciones.csv' o 'mapa.json'.")
         return
 
-    if not os.path.exists(carpeta_español):
-        os.makedirs(carpeta_español)
+    if not os.path.exists(carpeta_espanol):
+        os.makedirs(carpeta_espanol)
 
-    # --- 1. Cargar datos ---
-    # Cargar el mapa de traducción
+    # 1. Cargar datos
     with open(ruta_mapa, 'r', encoding='utf-8') as f:
         mapa_traduccion = json.load(f)
 
-    # Cargar las traducciones del CSV
     traducciones = []
     with open(ruta_csv, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
-        next(reader)  # Omitir la cabecera
+        next(reader)  # Omitir cabecera
         for row in reader:
-            if row: # Asegurarse de que la fila no esté vacía
+            if row:
                 traducciones.append(row[1])
 
-    if len(traducciones) != len(mapa_traduccion):
-        print("Error: El número de traducciones en el CSV no coincide con el mapa.")
-        return
+    # Crear un iterador para consumir las traducciones una a una
+    traducciones_iter = iter(traducciones)
 
-    # --- 2. Preparar los datos para la modificación ---
-    # Agrupar las modificaciones por archivo para eficiencia
-    modificaciones_por_archivo = defaultdict(list)
+    # 2. Agrupar modificaciones por archivo
+    modificaciones = defaultdict(list)
+    for entrada_mapa in mapa_traduccion:
+        archivo = entrada_mapa['archivo_original']
+        modificaciones[archivo].append(entrada_mapa)
 
-    # Expresión regular para encontrar el JSON y el texto en inglés original
-    regex_script = re.compile(r'(m_Script\s*=\s*")(.*)(")', re.DOTALL)
-
-    # Cargar los textos originales para cada entrada del mapa
-    for i, entrada_mapa in enumerate(mapa_traduccion):
-        id_original = entrada_mapa['id_original']
-        archivo_original = entrada_mapa['archivo_original']
-
-        # Necesitamos el texto original para poder reemplazarlo
-        # Esto es más seguro que solo usar el ID
-        # Para obtenerlo, leemos el JSON original
-        with open(archivo_original, 'r', encoding='utf-8') as f:
-            contenido_original = f.read()
-
-        match = regex_script.search(contenido_original)
-        if not match:
-            continue
-
-        json_str = match.group(2)
-        if json_str.startswith('\ufeff'):
-            json_str = json_str[1:]
-        json_str = json_str.replace('\\r', '').replace('\\n', '').replace('\\"', '"')
-
-        try:
-            data = json.loads(json_str)
-            for item in data.get('Data', []):
-                if item.get('ID') == id_original:
-                    texto_original_ingles = item['English']
-                    modificaciones_por_archivo[archivo_original].append({
-                        'texto_original': texto_original_ingles,
-                        'texto_traducido': traducciones[i]
-                    })
-                    break
-        except json.JSONDecodeError:
-            print(f"Advertencia: No se pudo leer el JSON del archivo original {archivo_original} al buscar el texto original.")
-            continue
-
-    # --- 3. Aplicar las modificaciones ---
-    print("Aplicando traducciones...")
-    for archivo_original, mods in modificaciones_por_archivo.items():
+    # 3. Aplicar las modificaciones
+    print("Aplicando traducciones con la lógica v2...")
+    for archivo_original, mods in modificaciones.items():
         print(f"  - Modificando {archivo_original}")
 
         with open(archivo_original, 'r', encoding='utf-8') as f:
-            contenido = f.read()
+            contenido_total = f.read()
 
-        # Realizar el reemplazo para cada texto en el contenido del archivo
         for mod in mods:
-            # El texto original y traducido deben ser escapados para formato JSON
-            original_text_json = json.dumps(mod['texto_original'])[1:-1]
-            traducido_text_json = json.dumps(mod['texto_traducido'])[1:-1]
+            estructura = mod['estructura']
 
-            # El patrón de búsqueda debe coincidir con el formato del archivo original,
-            # que tiene las comillas escapadas (ej: \"English\":\"Hello\")
-            patron_busqueda = f'\\"English\\":\\"{original_text_json}\\"'
-            patron_reemplazo = f'\\"English\\":\\"{traducido_text_json}\\"'
+            # Reconstruir el texto original y el traducido
+            texto_original = get_original_text(estructura)
+            texto_traducido = reconstruir_texto(estructura, traducciones_iter)
 
-            # Reemplazar solo la primera ocurrencia para evitar errores si el mismo texto aparece varias veces
-            contenido = contenido.replace(patron_busqueda, patron_reemplazo, 1)
+            # Escapar para el reemplazo en el JSON
+            original_escaped = json.dumps(texto_original)[1:-1]
+            traducido_escaped = json.dumps(texto_traducido)[1:-1]
 
-        # Guardar el archivo modificado en la carpeta 'español'
+            # Construir patrones de búsqueda y reemplazo
+            patron_busqueda = f'\\"English\\":\\"{original_escaped}\\"'
+            patron_reemplazo = f'\\"English\\":\\"{traducido_escaped}\\"'
+
+            # Aplicar el reemplazo
+            if patron_busqueda in contenido_total:
+                contenido_total = contenido_total.replace(patron_busqueda, patron_reemplazo, 1)
+            else:
+                print(f"  - ADVERTENCIA: No se encontró el patrón para el ID {mod['id_original']} en {archivo_original}.")
+                print(f"    Buscando: {patron_busqueda}")
+
+
+        # Guardar el archivo modificado
         nombre_archivo_salida = os.path.basename(archivo_original)
-        ruta_salida = os.path.join(carpeta_español, nombre_archivo_salida)
+        ruta_salida = os.path.join(carpeta_espanol, nombre_archivo_salida)
 
         with open(ruta_salida, 'w', encoding='utf-8') as f:
-            f.write(contenido)
+            f.write(contenido_total)
 
-    print("\n¡Proceso de importación completado!")
-    print(f"Los archivos traducidos se han guardado en la carpeta: '{carpeta_español}'")
+    print("\n¡Proceso de importación v2 completado!")
+    print(f"Los archivos traducidos se han guardado en la carpeta: '{carpeta_espanol}'")
 
 if __name__ == '__main__':
-    importar_traducciones()
+    importar_traducciones_actualizado()
