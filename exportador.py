@@ -75,7 +75,7 @@ def extraer_textos_actualizado():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v6 (codificación mejorada)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v7 (manejo de m_Script vacíos)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -84,7 +84,6 @@ def extraer_textos_actualizado():
         ruta_archivo = os.path.join(carpeta_ingles, nombre_archivo)
         print(f"Procesando: {ruta_archivo}")
 
-        # Usar 'utf-8-sig' para manejar correctamente el BOM (Byte Order Mark)
         with open(ruta_archivo, 'r', encoding='utf-8-sig') as f:
             contenido_archivo = f.read()
 
@@ -93,6 +92,11 @@ def extraer_textos_actualizado():
             continue
 
         json_str_raw = match.group(1)
+
+        # FIX: Ignorar si el contenido de m_Script está vacío o es solo whitespace
+        if not json_str_raw.strip():
+            print(f"  - ADVERTENCIA: m_Script está vacío en {nombre_archivo}. Omitiendo.")
+            continue
 
         json_str_decoded = ""
         try:
