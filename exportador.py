@@ -64,7 +64,7 @@ def extraer_textos_actualizado():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v9 (solución BOM)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v10 (último intento)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -86,13 +86,17 @@ def extraer_textos_actualizado():
             print(f"  - ADVERTENCIA: m_Script está vacío en {nombre_archivo}. Omitiendo.")
             continue
 
-        # --- LA SOLUCIÓN DEFINITIVA ---
-        # 1. Eliminar el carácter BOM (Byte Order Mark) del principio del string si existe.
-        if json_str_raw.startswith('\ufeff'):
-            json_str_raw = json_str_raw[1:]
+        # --- Limpieza final del string ---
+        temp_str = json_str_raw
+        # 1. Eliminar el carácter BOM (Byte Order Mark) del principio.
+        if temp_str.startswith('\ufeff'):
+            temp_str = temp_str[1:]
 
-        # 2. Reemplazar las comillas escapadas para que sea un JSON válido.
-        json_to_parse = json_str_raw.replace('\\"', '"')
+        # 2. Reemplazar las comillas escapadas.
+        temp_str = temp_str.replace('\\"', '"')
+
+        # 3. (NUEVO) Eliminar saltos de línea y retornos de carro, que pueden confundir al parser.
+        json_to_parse = temp_str.replace('\r', '').replace('\n', '')
 
         try:
             data = json.loads(json_to_parse)
