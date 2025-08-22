@@ -74,7 +74,7 @@ def importar_traducciones_quirurgico():
 
     # 4. Modificar cada archivo de forma quirúrgica
     print("Aplicando traducciones con la lógica v6 (quirúrgica)...")
-    for archivo_path, ids_en_archivo in archivos_a_modificar.items():
+    for archivo_path, ids_en_archivo in sorted(archivos_a_modificar.items()):
         print(f"  - Procesando archivo: {archivo_path}")
 
         try:

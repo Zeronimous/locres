@@ -2,25 +2,15 @@ import os
 import json
 import csv
 import re
-import codecs
 
-# --- Marcadores y Expresiones Regulares (Versión 3 - Final) ---
-
-# Expresión para excluir textos que son solo una variable interna (ej: {sigh1}, {Wrap})
+# --- Marcadores y Expresiones Regulares (Versión Final) ---
 EXCLUSION_PATTERN = re.compile(r'^\{[^}]+\}$')
-
-# Regex para marcadores estilo HTML: <tag>...</tag> o <tag=value>...</tag>
 HTML_TAG_REGEX = r'(<([a-zA-Z0-9]+)([^>]*)>(.*?)</\2>)'
-# Regex para marcadores estilo llave: {tag}...{/tag}
 BRACE_TAG_REGEX = r'(\{([a-zA-Z0-9]+)\}(.*?)\{/\6\})'
-# Regex para variables que no se traducen: {p1}, {x1}, {Wrap}, etc.
 VARIABLE_REGEX = r'(\{[^}]+\})'
-
-# Combinamos todas las expresiones en una sola.
 PARSER_REGEX = re.compile(f'{HTML_TAG_REGEX}|{BRACE_TAG_REGEX}|{VARIABLE_REGEX}', re.DOTALL)
 
 # --- Lógica de Análisis (Parsing) ---
-
 def parse_text(text):
     parts = []
     last_index = 0
@@ -57,7 +47,6 @@ def flatten_structure_for_csv(structure, text_list):
             flatten_structure_for_csv(part['children'], text_list)
 
 # --- Función Principal ---
-
 def extraer_textos_actualizado():
     carpeta_ingles = 'ingles'
     carpeta_textos = 'textos'
@@ -75,7 +64,7 @@ def extraer_textos_actualizado():
 
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v8 (diagnóstico)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v9 (solución BOM)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -97,15 +86,16 @@ def extraer_textos_actualizado():
             print(f"  - ADVERTENCIA: m_Script está vacío en {nombre_archivo}. Omitiendo.")
             continue
 
-        json_str_decoded = ""
-        try:
-            json_str_decoded = codecs.decode(json_str_raw, 'unicode_escape')
-        except Exception as e:
-            print(f"  - ADVERTENCIA: Error de decodificación en {nombre_archivo}. Error: {e}")
-            json_str_decoded = json_str_raw.replace('\\r', '').replace('\\n', '').replace('\\"', '"')
+        # --- LA SOLUCIÓN DEFINITIVA ---
+        # 1. Eliminar el carácter BOM (Byte Order Mark) del principio del string si existe.
+        if json_str_raw.startswith('\ufeff'):
+            json_str_raw = json_str_raw[1:]
+
+        # 2. Reemplazar las comillas escapadas para que sea un JSON válido.
+        json_to_parse = json_str_raw.replace('\\"', '"')
 
         try:
-            data = json.loads(json_str_decoded)
+            data = json.loads(json_to_parse)
             for item in data.get('Data', []):
                 texto_ingles = item.get('English', '')
                 id_original = item.get('ID', '')
@@ -137,9 +127,8 @@ def extraer_textos_actualizado():
                 base_index += 1
 
         except json.JSONDecodeError as e:
-            print(f"  - Error JSON en {nombre_archivo}: {e}")
-            # Línea de diagnóstico añadida:
-            print(f"    Contenido problemático (primeros 200 caracteres): {json_str_decoded[:200]}")
+            print(f"  - Error JSON Final en {nombre_archivo}: {e}")
+            print(f"    Contenido que falló (primeros 200 chars): {json_to_parse[:200]}")
             continue
 
     ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
