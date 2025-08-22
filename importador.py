@@ -96,20 +96,20 @@ def importar_traducciones_quirurgico():
             # Construir una regex para encontrar el objeto JSON por su ID
             # Esto es complejo: busca {"ID":"el_id", ... "English":"valor", ...}
             # y captura solo el valor de "English" para ese ID.
+            # Se ha hecho más robusto para manejar espacios y saltos de línea
             patron_obj_id = re.compile(
                 r'(\{\s*\\"ID\\"\s*:\s*\\"' + id_escaped + r'\\"\s*,' +  # Busca {"ID":"id",
-                r'.*?' + # Cualquier caracter hasta llegar a English
+                r'[\s\S]*?' + # Cualquier caracter (incluyendo saltos de línea) hasta llegar a English
                 r'\\"English\\"\s*:\s*\\")' + # Busca "English":
-                r'(.*?)' + # Captura el valor actual de English (Grupo 2)
+                r'((?:\\"|[^"])*?)' + # Captura el valor actual de English (Grupo 2). Maneja comillas escapadas.
                 r'(\\"' + # Captura la comilla de cierre (Grupo 3)
-                r'[,\}])', # El valor termina en comilla y luego , o }
+                r'\s*[,\}])', # El valor termina en comilla y luego , o }
                 re.DOTALL
             )
 
             # Función de reemplazo que inserta el texto traducido
             def replacer_quirurgico(match):
                 grupo_inicio = match.group(1) # {"ID"...,"English":
-                # grupo_contenido_antiguo = match.group(2)
                 grupo_fin = match.group(3) # "} o ",
 
                 # Obtener la traducción y escaparla para JSON
