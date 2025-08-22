@@ -2,6 +2,7 @@ import os
 import json
 import csv
 import re
+import codecs
 
 # --- Marcadores y Expresiones Regulares (Versión 2) ---
 
@@ -121,13 +122,25 @@ def extraer_textos_actualizado():
         if not match:
             continue
 
-        json_str = match.group(1)
-        if json_str.startswith('\ufeff'):
-            json_str = json_str[1:]
-        json_str = json_str.replace('\\r', '').replace('\\n', '').replace('\\"', '"')
+        json_str_raw = match.group(1)
+
+        # Usar codecs.decode para un manejo robusto de secuencias de escape (ej: \", \\, \n)
+        # Esto es clave para manejar correctamente textos con comillas internas.
+        json_str_decoded = ""
+        try:
+            # Primero, quitamos el BOM si existe, que no es parte del escape
+            if json_str_raw.startswith('\ufeff'):
+                json_str_raw = json_str_raw[1:]
+
+            # Decodificar la cadena para interpretar correctamente los escapes
+            json_str_decoded = codecs.decode(json_str_raw, 'unicode_escape')
+        except Exception as e:
+            print(f"  - ADVERTENCIA: Error de decodificación en {nombre_archivo}. Puede que algunos textos no se procesen. Error: {e}")
+            # Como fallback, intentamos con el método antiguo
+            json_str_decoded = json_str_raw.replace('\\r', '').replace('\\n', '').replace('\\"', '"')
 
         try:
-            data = json.loads(json_str)
+            data = json.loads(json_str_decoded)
             for item in data.get('Data', []):
                 texto_ingles = item.get('English', '')
                 id_original = item.get('ID', '')
