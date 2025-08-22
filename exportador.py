@@ -12,7 +12,6 @@ PARSER_REGEX = re.compile(f'{HTML_TAG_REGEX}|{BRACE_TAG_REGEX}|{VARIABLE_REGEX}'
 
 # --- Lógica de Análisis (Parsing) ---
 def parse_text(text):
-    # ... (esta función no necesita cambios)
     parts = []
     last_index = 0
     for match in PARSER_REGEX.finditer(text):
@@ -35,14 +34,13 @@ def parse_text(text):
     return parts
 
 def flatten_structure_for_csv(structure, text_list):
-    # ... (esta función no necesita cambios)
     for part in structure:
         if part['type'] == 'text' and part['content'].strip():
             text_list.append(part['content'])
         elif part.get('children'):
             flatten_structure_for_csv(part['children'], text_list)
 
-# --- Función Principal (v12 - Extracción Quirúrgica) ---
+# --- Función Principal (v13 - Extracción Quirúrgica Corregida) ---
 def extraer_textos_quirurgico():
     carpeta_ingles = 'ingles'
     carpeta_textos = 'textos'
@@ -57,14 +55,13 @@ def extraer_textos_quirurgico():
     mapa_traduccion_final = []
     base_index = 1
 
-    # Regex para encontrar la línea de m_Script
     regex_script_line = re.compile(r'm_Script\s*=\s*"(.*)"', re.DOTALL)
 
-    # Regex quirúrgica para extraer pares de ID y English del texto plano
+    # Regex quirúrgica CORREGIDA: usa '.*?' para ser más flexible
     # Captura: 1=ID, 2=English
-    regex_quirurgico = re.compile(r'\{\s*\\"ID\\"\s*:\s*\\"(.*?)\\"[^}]*?\\"English\\"\s*:\s*\\"(.*?)\\"')
+    regex_quirurgico = re.compile(r'\{\s*\\"ID\\"\s*:\s*\\"(.*?)\\".*?\\"English\\"\s*:\s*\\"(.*?)\\"')
 
-    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v12 (quirúrgica)...")
+    print(f"Buscando archivos en '{carpeta_ingles}' con la lógica v13 (quirúrgica corregida)...")
 
     for nombre_archivo in sorted(os.listdir(carpeta_ingles)):
         if not nombre_archivo.endswith('.txt'):
@@ -85,24 +82,22 @@ def extraer_textos_quirurgico():
             print(f"  - ADVERTENCIA: m_Script está vacío en {nombre_archivo}. Omitiendo.")
             continue
 
-        # Iterar sobre todas las coincidencias de ID/English en el contenido
         for match_item in regex_quirurgico.finditer(script_content):
-            id_original_escaped, texto_ingles_escaped = match_item.groups()
+            id_original, texto_ingles_escaped = match_item.groups()
 
-            # Un-escape del texto en inglés para poder procesarlo
             texto_ingles = texto_ingles_escaped.replace('\\"', '"').replace('\\\\', '\\')
 
             if not texto_ingles:
                 continue
 
             if EXCLUSION_PATTERN.match(texto_ingles):
-                print(f"  - Excluyendo ID {id_original_escaped}: '{texto_ingles}'")
+                print(f"  - Excluyendo ID {id_original}: '{texto_ingles}'")
                 continue
 
             estructura_parseada = parse_text(texto_ingles)
 
             mapa_traduccion_final.append({
-                'id_original': id_original_escaped,
+                'id_original': id_original,
                 'archivo_original': ruta_archivo,
                 'estructura': estructura_parseada
             })
@@ -118,7 +113,6 @@ def extraer_textos_quirurgico():
 
             base_index += 1
 
-    # Guardar CSV y Mapa
     ruta_csv = os.path.join(carpeta_textos, 'traducciones.csv')
     with open(ruta_csv, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)

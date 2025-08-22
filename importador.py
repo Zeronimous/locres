@@ -94,8 +94,6 @@ def importar_traducciones_quirurgico():
             id_escaped = re.escape(id_original)
 
             # Construir una regex para encontrar el objeto JSON por su ID
-            # Esto es complejo: busca {"ID":"el_id", ... "English":"valor", ...}
-            # y captura solo el valor de "English" para ese ID.
             # Se ha hecho más robusto para manejar espacios y saltos de línea
             patron_obj_id = re.compile(
                 r'(\{\s*\\"ID\\"\s*:\s*\\"' + id_escaped + r'\\"\s*,' +  # Busca {"ID":"id",
