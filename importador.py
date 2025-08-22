@@ -15,25 +15,33 @@ def reconstruir_texto(structure, traducciones_iter):
     for part in structure:
         tipo = part.get('type')
         if tipo == 'text':
+            # Si el texto original estaba vacío o solo espacios, no está en el CSV.
             if part['content'].strip():
                 try:
+                    # Tomar el siguiente texto de la lista de traducciones
                     resultado.append(next(traducciones_iter))
                 except StopIteration:
                     print("Error: Faltan traducciones en el archivo CSV para reconstruir una frase.")
+                    # Añadir el contenido original como fallback
                     resultado.append(part['content'])
             else:
+                # Añadir el texto original si estaba vacío o era solo espacio
                 resultado.append(part['content'])
 
         elif tipo == 'variable':
             resultado.append(part['content'])
 
         elif tipo == 'tag_html':
+            # Reconstruir el contenido de los hijos recursivamente
             contenido_hijo = reconstruir_texto(part['children'], traducciones_iter)
-            tag_name = part['tag'].split('=')[0]
+            # Envolver con la etiqueta HTML
+            tag_name = part['tag'].split('=')[0] # Para <color=..> nos quedamos con "color"
             resultado.append(f"<{part['tag']}>{contenido_hijo}</{tag_name}>")
 
         elif tipo == 'tag_brace':
+            # Reconstruir el contenido de los hijos recursivamente
             contenido_hijo = reconstruir_texto(part['children'], traducciones_iter)
+            # Envolver con la etiqueta de llaves
             resultado.append(f"{{{part['tag']}}}{contenido_hijo}{{/{part['tag']}}}")
 
     return "".join(resultado)
@@ -83,11 +91,12 @@ def importar_traducciones_actualizado():
     traducciones = []
     with open(ruta_csv, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
-        next(reader)
+        next(reader)  # Omitir cabecera
         for row in reader:
             if row:
                 traducciones.append(row[1])
 
+    # Crear un iterador para consumir las traducciones una a una
     traducciones_iter = iter(traducciones)
 
     # 2. Agrupar modificaciones por archivo
@@ -97,7 +106,7 @@ def importar_traducciones_actualizado():
         modificaciones[archivo].append(entrada_mapa)
 
     # 3. Aplicar las modificaciones
-    print("Aplicando traducciones con la lógica v3 (más robusta)...")
+    print("Aplicando traducciones con la lógica v4 (la más segura)...")
     for archivo_original, mods in modificaciones.items():
         print(f"  - Modificando {archivo_original}")
 
@@ -107,26 +116,33 @@ def importar_traducciones_actualizado():
         for mod in mods:
             estructura = mod['estructura']
 
+            # Reconstruir el texto original y el traducido
             texto_original = get_original_text(estructura)
             texto_traducido = reconstruir_texto(estructura, traducciones_iter)
 
             # Escapar para el reemplazo en el JSON
-            original_escaped = json.dumps(texto_original)[1:-1]
-            traducido_escaped = json.dumps(texto_traducido)[1:-1]
+            original_escaped_json = json.dumps(texto_original, ensure_ascii=False)[1:-1]
+            traducido_escaped_json = json.dumps(texto_traducido, ensure_ascii=False)[1:-1]
 
-            # Construir patrones de búsqueda y reemplazo usando REGEX para más flexibilidad
-            # re.escape se asegura de que caracteres especiales como ( ) [ ] . ? no rompan la regex
-            patron_busqueda_regex = f'(\\"English\\"\\s*:\\s*\\"){re.escape(original_escaped)}(\\")'
-            # El reemplazo mantiene el formato original, pero con el texto traducido
-            patron_reemplazo_regex = f'\\1{traducido_escaped}\\2'
+            # Patrón de búsqueda con regex, escapando el texto original para seguridad
+            patron_busqueda_regex = f'(\\"English\\"\\s*:\\s*\\"){re.escape(original_escaped_json)}(\\")'
 
-            # Aplicar el reemplazo usando re.sub
-            nuevo_contenido, num_reemplazos = re.subn(patron_busqueda_regex, patron_reemplazo_regex, contenido_total, count=1)
+            # FUNCIÓN DE REEMPLAZO (LA SOLUCIÓN DEFINITIVA)
+            # Usamos una función 'lambda' para el reemplazo. Esto trata el texto
+            # traducido como un texto literal y evita errores de 'bad escape'.
+            def replacer(match):
+                # Reconstruimos la cadena: (grupo 1) + texto traducido + (grupo 2)
+                # match.group(1) es '\"English\":\"'
+                # match.group(2) es '\"'
+                return f'{match.group(1)}{traducido_escaped_json}{match.group(2)}'
+
+            # Aplicar el reemplazo usando re.subn y la función replacer
+            nuevo_contenido, num_reemplazos = re.subn(patron_busqueda_regex, replacer, contenido_total, count=1)
 
             if num_reemplazos > 0:
                 contenido_total = nuevo_contenido
             else:
-                print(f"  - ADVERTENCIA: No se encontró el patrón para el ID {mod['id_original']} en {archivo_original}.")
+                print(f"  - ADVERTENCIA FINAL: No se encontró el patrón para el ID {mod['id_original']} en {archivo_original}.")
                 print(f"    Buscando (regex): {patron_busqueda_regex}")
 
         # Guardar el archivo modificado
@@ -136,7 +152,7 @@ def importar_traducciones_actualizado():
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             f.write(contenido_total)
 
-    print("\n¡Proceso de importación v3 completado!")
+    print("\n¡Proceso de importación v4 completado!")
     print(f"Los archivos traducidos se han guardado en la carpeta: '{carpeta_espanol}'")
 
 if __name__ == '__main__':
